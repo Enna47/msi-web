@@ -1,0 +1,162 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum EnrollStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  userId    String   @id @default(cuid())
+  userName  String   @unique
+  password  String
+  role      Role
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coursesCreated  Course[]         @relation("CourseCreatedBy")
+  batchesCreated  Batch[]          @relation("BatchCreatedBy")
+  paymentAccounts PaymentAccount[]
+  enrolls         Enroll[]
+
+  @@map("users")
+}
+
+model Image {
+  imageId   String   @id @default(cuid())
+  url       String
+  key       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course           Course?
+  paymentAccountIcon   PaymentAccount? @relation("PaymentAccountIcon")
+  paymentAccountQrcode PaymentAccount? @relation("PaymentAccountQrcode")
+  enrollPaymentSS      Enroll?         @relation("EnrollPaymentSS")
+
+  @@map("images")
+}
+
+model Course {
+  courseId    String   @id @default(cuid())
+  createdBy   String
+  title       String
+  description String?
+  level       Level
+  duration    String?
+  depositFees Decimal? @db.Decimal(10, 2)
+  fees        Decimal? @db.Decimal(10, 2)
+  imageId     String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User             @relation("CourseCreatedBy", fields: [createdBy], references: [userId])
+  image       Image            @relation(fields: [imageId], references: [imageId])
+  outlines    CourseOutline[]
+  prerequisites Prerequisite[]
+  batches     Batch[]
+  enrolls     Enroll[]
+
+  @@map("courses")
+}
+
+model CourseOutline {
+  courseOutlineId String   @id @default(cuid())
+  courseId        String
+  description     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  course          Course @relation(fields: [courseId], references: [courseId], onDelete: Cascade)
+
+  @@map("courseOutlines")
+}
+
+model Prerequisite {
+  prerequisiteId String   @id @default(cuid())
+  courseId       String
+  description    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  course         Course @relation(fields: [courseId], references: [courseId], onDelete: Cascade)
+
+  @@map("prerequisite")
+}
+
+model Batch {
+  batchId   String    @id @default(cuid())
+  createdBy String
+  courseId  String
+  startDate DateTime?
+  classTime String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  creator   User     @relation("BatchCreatedBy", fields: [createdBy], references: [userId])
+  course    Course   @relation(fields: [courseId], references: [courseId])
+  enrolls   Enroll[]
+
+  @@map("batches")
+}
+
+model PaymentAccount {
+  paymentAccountId String   @id @default(cuid())
+  userId           String
+  iconId           String   @unique
+  qrcodeId         String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  owner            User     @relation(fields: [userId], references: [userId])
+  icon             Image    @relation("PaymentAccountIcon", fields: [iconId], references: [imageId])
+  qrcode           Image    @relation("PaymentAccountQrcode", fields: [qrcodeId], references: [imageId])
+  enrolls          Enroll[]
+
+  @@map("paymentAccounts")
+}
+
+model Enroll {
+  enrollId         String        @id @default(cuid())
+  status           EnrollStatus?
+  userId           String
+  courseId         String
+  paymentAccountId String
+  batchId          String
+  paymentSSId      String        @unique
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  student          User           @relation(fields: [userId], references: [userId])
+  course           Course         @relation(fields: [courseId], references: [courseId])
+  paymentAccount   PaymentAccount @relation(fields: [paymentAccountId], references: [paymentAccountId])
+  batch            Batch          @relation(fields: [batchId], references: [batchId])
+  paymentSS        Image          @relation("EnrollPaymentSS", fields: [paymentSSId], references: [imageId])
+
+  @@map("enrolls")
+}
